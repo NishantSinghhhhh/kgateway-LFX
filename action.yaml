@@ -1,0 +1,53 @@
+# file: .github/workflows/performance-tests.yaml
+name: Performance Tests
+
+on:
+  pull_request:
+    branches: ["**"]   # Run on all PRs (targeting any branch)
+
+jobs:
+  performance:
+    name: Run Performance Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 60   # allocate sufficient time for performance tests
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.20"   # Use an appropriate Go version
+
+      - name: Install Ginkgo CLI
+        run: go install github.com/onsi/ginkgo/v2/ginkgo@v2.9.5
+
+      - name: Set up KinD cluster
+        if: github.os == 'linux'   # Only run Kind on Linux runners
+        uses: helm/kind-action@v1.3.0
+        with:
+          version: v0.20.0        # KinD version
+          # (By using a pre-made action for KinD, we create a cluster for running the gateway)
+      
+      - name: Build kgateway containers (if needed)
+        run: make docker-build   # Ensure the gateway images are built for the Kind cluster
+        env:
+          # use any environment variables needed for build (e.g., GOOS, GOARCH)
+          CGO_ENABLED: 0
+
+      - name: Run performance tests
+        env:
+          # Pass any needed env variables to tests (e.g., KUBECONFIG for KinD cluster)
+          KUBECONFIG: ${{ runner.temp }}/kubeconfig
+        run: |
+          # Run only tests labeled "performance", in serial mode
+          # Using Makefile target for consistency:
+          make perf-tests GINKGO_FLAGS="--procs=1 --junit-report=perf-junit.xml" 2>&1 | tee performance.log
+          
+      - name: Archive performance test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-test-logs
+          path: |
+            performance.log
+            perf-junit.xml
