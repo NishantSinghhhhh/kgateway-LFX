@@ -1,0 +1,48 @@
+// file: test/performance/load_test.go
+package performance
+
+import (
+    "fmt"
+    "time"
+    "github.com/onsi/ginkgo/v2"
+    "github.com/onsi/gomega"
+
+    // Reuse existing labels and decorators for consistency
+    "kgateway/test/decorators"  // contains Ginkgo decorators (e.g., Serial, Performance)
+    "kgateway/test/labels"      // contains label constants (e.g., Performance, Serial)
+)
+
+var _ = ginkgo.Describe("High Load Routing", decorators.Performance, decorators.Serial, func() {
+    // This BeforeEach could deploy a test gateway and clients, ensuring a fresh environment per test.
+    ginkgo.BeforeEach(func() {
+        // (Setup logic: e.g., deploy kgateway to a test cluster or reset state)
+    })
+
+    ginkgo.It("should handle 1000 concurrent requests with acceptable latency", func() {
+        start := time.Now()
+        // Simulate or send 1000 concurrent requests through the gateway (pseudocode)
+        err := simulateConcurrentRequests(1000)
+        gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+        duration := time.Since(start)
+        fmt.Fprintf(ginkgo.GinkgoWriter, "Handled 1000 requests in %s\n", duration)
+
+        // Verify performance criteria (example: all requests succeeded under 2s total)
+        gomega.Expect(duration.Seconds()).To(gomega.BeNumerically("<", 2.0), 
+            "Requests took too long")
+    })
+
+    ginkgo.It("scales to 500 Routes without increased error rate", func() {
+        // Setup 500 routes in the gateway
+        err := configureNRoutes(500)
+        gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+        // Send test traffic and measure error rate
+        successCount, totalCount := sendTraffic()
+        errorRate := 1 - float64(successCount)/float64(totalCount)
+        fmt.Fprintf(ginkgo.GinkgoWriter, "Error rate at 500 routes: %.2f%%\n", errorRate*100)
+
+        // Ensure error rate stays below 0.1%
+        gomega.Expect(errorRate).To(gomega.BeNumerically("<", 0.001), "Error rate too high under load")
+    })
+})
